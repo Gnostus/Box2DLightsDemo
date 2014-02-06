@@ -1,10 +1,8 @@
 package com.dbruce.box2dlightshelloworld;
 
-import java.util.ArrayList;
-
 import box2dLight.ConeLight;
 import box2dLight.DirectionalLight;
-import box2dLight.PointLight;
+import box2dLight.Light;
 import box2dLight.RayHandler;
 
 import com.badlogic.gdx.ApplicationListener;
@@ -23,6 +21,7 @@ import com.badlogic.gdx.physics.box2d.CircleShape;
 import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.utils.Array;
 
 public class Box2DLightsHelloWorld implements ApplicationListener {
 
@@ -37,18 +36,21 @@ public class Box2DLightsHelloWorld implements ApplicationListener {
 	private OrthographicCamera camera;
 	private World world;
 	private Box2DDebugRenderer renderer;
-	
-	private ArrayList<Body> bodies = new ArrayList<Body>();
+	Array<Body> bodies = new Array<Body>();
 
 	float width, height;
 
 	FPSLogger logger;
 
-	Body circleBody, square1, square2;
+	Body circleBody, square1, square2, bullet;
 
 	RayHandler rayHandler;
+	Light sun1, sun2, sun3, sun4;
 
+	Color sunColor = new Color(3, 12, 33, 0.5f);
 	float accelX, accelY;
+	
+	private Vector2 circlePos;
 
 	@Override
 	public void create() {
@@ -64,7 +66,6 @@ public class Box2DLightsHelloWorld implements ApplicationListener {
 		
 		rayHandler = new RayHandler(world);
 		rayHandler.setCombinedMatrix(camera.combined);
-		Gdx.input.setInputProcessor(new InputHandler(world,rayHandler, camera));
 		
 		renderer = new Box2DDebugRenderer();
 
@@ -74,6 +75,7 @@ public class Box2DLightsHelloWorld implements ApplicationListener {
 		BodyDef circleDef = new BodyDef();
 		circleDef.type = BodyType.DynamicBody;
 		circleDef.position.set(width / 2f, height / 2f);
+		
 
 		circleBody = world.createBody(circleDef);
 
@@ -88,23 +90,19 @@ public class Box2DLightsHelloWorld implements ApplicationListener {
 
 		circleBody.createFixture(circleFixture);
 		bodies.add(circleBody);
+		
 
 		for(int i = 0; i < 20; i++){
 			createSquare(width/2f, height/2f + 10 + (i*2), 2 + (i/2), 2 + (i/2), i, 0.2f, 1/2f);
 		}
+				
+		new ConeLight(rayHandler, 1000, new Color(3, 12, 33, 1f), 100, width/2, height/2, 360, 360);
+		new ConeLight(rayHandler, 1000, new Color(3, 12, 33, 1f), 100, width/2/2, height/2/2, 360, 360);
+		new DirectionalLight(rayHandler, 1000, sunColor, 360);
+		sun1 = rayHandler.lightList.get(2);
+		sun1.setXray(true);
 
-//		new PointLight(rayHandler, 400, Color.CYAN, 500, (width / 2 -50),
-//				(height / 2) + 25);
-//		new ConeLight(rayHandler, 400, Color.PINK, 800, (width / 2) + 50,
-//				(height / 2) + 30, 220, 35);
-//		new PointLight(rayHandler, 400, Color.CYAN, 250, (width / 2 + 50),
-//				(height / 2) - 25);
-//		new ConeLight(rayHandler, 8000, new Color(3, 12, 33, 0.5f), 1000, 0, 0, 360, 360);
-//		new ConeLight(rayHandler, 8000, new Color(3, 12, 33, 0.5f), 1000, 0, height, 360, 360);
-//		new ConeLight(rayHandler, 8000, new Color(3, 12, 33, 0.5f), 1000, width, height, 360, 360);
-//		new ConeLight(rayHandler, 8000, new Color(3, 12, 33, 0.5f), 1000, width, 0, 360, 360);
-		new ConeLight(rayHandler, 1000, new Color(3, 12, 33, 1f), 1000, width/2, height/2, 360, 360);
-		new ConeLight(rayHandler, 1000, new Color(3, 12, 33, 1f), 1000, width/2/2, height/2/2, 360, 360);
+		Gdx.input.setInputProcessor(new InputHandler(world,rayHandler, camera));
 	}
 
 	private void setUpWalls() {
@@ -115,7 +113,7 @@ public class Box2DLightsHelloWorld implements ApplicationListener {
 		Body groundBody = world.createBody(groundBodyDef);
 
 		PolygonShape groundBox = new PolygonShape();
-		groundBox.setAsBox(camera.viewportWidth * 2, 3.0f);
+		groundBox.setAsBox(width * 2, 3.0f);
 
 		groundBody.createFixture(groundBox, 0.0f);
 
@@ -126,29 +124,29 @@ public class Box2DLightsHelloWorld implements ApplicationListener {
 		Body leftWall = world.createBody(leftWallDef);
 
 		PolygonShape leftWallShape = new PolygonShape();
-		leftWallShape.setAsBox(3.0f, camera.viewportHeight * 2);
+		leftWallShape.setAsBox(3.0f, height * 2);
 
 		leftWall.createFixture(leftWallShape, 0.0f);
 
 		// rightWall
 		BodyDef rightWallDef = new BodyDef();
-		rightWallDef.position.set(camera.viewportWidth - 3, 3);
+		rightWallDef.position.set(width - 3, 3);
 
 		Body rightWall = world.createBody(rightWallDef);
 
 		PolygonShape rightWallShape = new PolygonShape();
-		rightWallShape.setAsBox(3.0f, camera.viewportHeight * 2);
+		rightWallShape.setAsBox(3.0f, height * 2);
 
 		rightWall.createFixture(rightWallShape, 0.0f);
 
 		// ceiling
 		BodyDef ceilingDef = new BodyDef();
-		ceilingDef.position.set(0, camera.viewportHeight - 3);
+		ceilingDef.position.set(0, height - 3);
 
 		Body ceiling = world.createBody(ceilingDef);
 
 		PolygonShape ceilingShape = new PolygonShape();
-		ceilingShape.setAsBox(camera.viewportWidth * 2, 3.0f);
+		ceilingShape.setAsBox(width * 2, 3.0f);
 
 		ceiling.createFixture(ceilingShape, 0.0f);
 	}
@@ -164,7 +162,7 @@ public class Box2DLightsHelloWorld implements ApplicationListener {
 		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
 
 		checkInput();
-		
+
 		renderer.render(world, camera.combined);
 		
 		rayHandler.setBlur(true);

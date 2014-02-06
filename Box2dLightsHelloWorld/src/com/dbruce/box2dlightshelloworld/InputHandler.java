@@ -6,11 +6,18 @@ import box2dLight.Light;
 import box2dLight.RayHandler;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputProcessor;
-import com.badlogic.gdx.graphics.Camera;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.physics.box2d.Body;
+import com.badlogic.gdx.physics.box2d.BodyDef;
+import com.badlogic.gdx.physics.box2d.FixtureDef;
+import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
+import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.utils.Array;
 
 public class InputHandler implements InputProcessor {
 
@@ -20,22 +27,44 @@ public class InputHandler implements InputProcessor {
 	private RayHandler rayHandler;
 	Vector3 touch = new Vector3();
 	Vector2 v2Touch;
-	private Camera camera;
+	private OrthographicCamera camera;
+	Light light, light2;
+	Boolean shift = false;
+	Array<Body> bullets = new Array<Body>();
 
-	public InputHandler(World world, RayHandler rayHandler, Camera camera) {
+	Vector2 v2Clicked = new Vector2();
+	Vector3 clicked = new Vector3();
+
+	float bulletWidth = 0, bulletHeight = 0;
+	boolean dragged;
+
+	public InputHandler(World world, RayHandler rayHandler,
+			OrthographicCamera camera) {
 		this.world = world;
 		this.rayHandler = rayHandler;
 		this.camera = camera;
 		gravity = world.getGravity();
+		light = rayHandler.lightList.get(0);
+		light2 = rayHandler.lightList.get(1);
 	}
 
 	@Override
 	public boolean keyDown(int keycode) {
+		switch (keycode) {
+		case Keys.SHIFT_LEFT:
+			shift = true;
+			break;
+		}
 		return true;
 	}
 
 	@Override
 	public boolean keyUp(int keycode) {
+		switch (keycode) {
+		case Keys.SHIFT_LEFT:
+			shift = false;
+			break;
+		}
 		return true;
 	}
 
@@ -58,6 +87,18 @@ public class InputHandler implements InputProcessor {
 			if (gravity.x <= 10)
 				gravity.x += 0.25f;
 			break;
+		case '-':
+			light.setDistance(light.getDistance() - 5);
+			break;
+		case '=':
+			light.setDistance(light.getDistance() + 5);
+			break;
+		case '_':
+			light2.setDistance(light2.getDistance() - 5);
+			break;
+		case '+':
+			light2.setDistance(light2.getDistance() + 5);
+			break;
 		default:
 			break;
 		}
@@ -68,46 +109,78 @@ public class InputHandler implements InputProcessor {
 
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-		// TODO Auto-generated method stub
-		return false;
+		if (!Gdx.input.isKeyPressed(Keys.SHIFT_LEFT)
+				|| !Gdx.input.isKeyPressed(Keys.CONTROL_LEFT)) {
+			clicked.x = screenX;
+			clicked.y = screenY;
+			camera.unproject(clicked);
+			v2Clicked.x = clicked.x;
+			v2Clicked.y = clicked.y;
+
+		}
+		return true;
 	}
 
 	@Override
 	public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-		// TODO Auto-generated method stub
-		return false;
+		if (dragged) {
+			if (!Gdx.input.isKeyPressed(Keys.SHIFT_LEFT)
+					|| !Gdx.input.isKeyPressed(Keys.CONTROL_LEFT)) {
+				BodyDef bulletDef = new BodyDef();
+				bulletDef.type = BodyType.DynamicBody;
+				bulletDef.bullet = true;
+				bulletDef.position.set(v2Clicked);
+
+				Body bullet = world.createBody(bulletDef);
+
+				PolygonShape bulletShape = new PolygonShape();
+				bulletShape.setAsBox(0.5f, 0.2f);
+
+				FixtureDef bulletFixtureDef = new FixtureDef();
+				bulletFixtureDef.shape = bulletShape;
+				bulletFixtureDef.density = 10000;
+				bulletFixtureDef.restitution = 0.5f;
+				
+				bullet.createFixture(bulletFixtureDef);
+
+				bullet.applyLinearImpulse(new Vector2(3000, 3000), bullet.getLocalCenter(), false);
+				
+				bullets.add(bullet);
+
+			}
+		}
+		return true;
 	}
 
 	@Override
 	public boolean touchDragged(int screenX, int screenY, int pointer) {
-		Gdx.app.log("Pointer: ", ""+pointer);
-		if(pointer == 0){
+		dragged = true;
+		if (pointer == 0) {
 			touch.set(screenX, screenY, 0);
-		camera.unproject(touch);
-		
-		Light light = rayHandler.lightList.get(0);		
-		light.setPosition(touch.x, touch.y);
+			camera.unproject(touch);
+
+			if (Gdx.input.isKeyPressed(Keys.SHIFT_LEFT))
+				light2.setPosition(touch.x, touch.y);
+			else if (Gdx.input.isKeyPressed(Keys.CONTROL_LEFT))
+				light.setPosition(touch.x, touch.y);
 		}
-		if(pointer == 1){
-			touch.set(screenX, screenY, 0);
-		camera.unproject(touch);
-		
-		Light light = rayHandler.lightList.get(1);		
-		light.setPosition(touch.x, touch.y);
-		}
-		return false;
+		return true;
 	}
 
 	@Override
 	public boolean mouseMoved(int screenX, int screenY) {
-		Gdx.app.log("Mouse: ", screenX + ", " + screenY);
 		return false;
 	}
 
 	@Override
 	public boolean scrolled(int amount) {
-		Light light = rayHandler.lightList.get(0);
-		light.setDistance(light.getDistance() + 5*amount);
-		return false;
+		if (camera.zoom + amount > 0) {
+			camera.zoom += amount;
+			camera.update();
+			rayHandler.setCombinedMatrix(camera.combined);
+			rayHandler.updateAndRender();
+			Gdx.app.log("zoom: ", "" + camera.zoom);
+		}
+		return true;
 	}
 }
